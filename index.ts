@@ -1,4 +1,4 @@
-type BuiltInTag = "home" | "work";
+type BuiltInTag = "home" | "work" | "school";
 
 type TodoTag = BuiltInTag | { custom: string };
 
@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const updateStateEvent = new CustomEvent("updateState", {});
 // Exemplo de generics
+/*
 function makeState<S>(initialState: S) {
   let state: S;
   function getState() {
@@ -29,11 +30,31 @@ function makeState<S>(initialState: S) {
   setState(initialState);
   return { getState, setState };
 }
+*/
+
+class StateManager<S> {
+  _state: S;
+  
+  constructor(initialState: S) {
+    this._state = initialState;
+  }
+
+  get state() {
+    return this._state;
+  }
+
+  set state(x: S) {
+    this._state = x;
+    document.dispatchEvent(updateStateEvent);
+  }
+}
 
 // Application
 function TodoApp(listElement: HTMLDivElement) {
-  const { getState, setState } = makeState<Todo[]>([]);
-  const dataSet: Set<BuiltInTag> = new Set(["home", "work"]);
+  const todoMngr = new StateManager<Todo[]>([]);
+  const dataSet: Set<BuiltInTag> = new Set([<BuiltInTag>"home", 
+                                            <BuiltInTag>"work",
+                                            <BuiltInTag>"school"]);
   let nextId = 0;
 
   listElement.innerHTML = `
@@ -72,10 +93,10 @@ function TodoApp(listElement: HTMLDivElement) {
     formElement.classList.add("was-validated");
     if (!formElement.checkValidity()) return;
 
-    setState([
-      ...getState(),
+    todoMngr.state = [
+      ...todoMngr.state,
       createTodo(inputTextElement.value, inputTagElement.value),
-    ]);
+    ];
 
     // Resetar o form
     formElement.reset();
@@ -85,7 +106,7 @@ function TodoApp(listElement: HTMLDivElement) {
   const aElement = listElement.querySelector("a")!;
   aElement.addEventListener("click", (ev) => {
     ev.preventDefault();
-    setState(completeAll(getState()));
+    todoMngr.state= completeAll(todoMngr.state);
   });
 
   function todoDivElement(todo: Todo): HTMLDivElement {
@@ -116,17 +137,17 @@ function TodoApp(listElement: HTMLDivElement) {
     const id = todo.id;
     const newTodo = toggleTodo(todo);
 
-    const data = getState().filter((el) => el.id != id);
+    const data = todoMngr.state.filter((el) => el.id != id);
 
     data.push(newTodo);
 
     data.sort((a, b) => a.id - b.id);
 
-    setState(data);
+    todoMngr.state = data;
   }
 
   function toggleTodo(todo: Todo): Todo {
-    
+    return {...todo, done: !todo.done};
   }
 
   function createTodo(text: string, rawTag: string = ""): Todo {
@@ -139,7 +160,9 @@ function TodoApp(listElement: HTMLDivElement) {
   }
 
   function getTodoTag(tag: string): TodoTag {
-    return tag === "home" || tag === "work" ? tag : { custom: tag };
+    let t = [...dataSet].filter((el) => el === tag);
+    if (t.length == 0) return { custom: tag };
+    else return t[0];
   }
 
   function createTodoTagTuple(tag: TodoTag): [HTMLElement, HTMLSpanElement] {
@@ -154,6 +177,8 @@ function TodoApp(listElement: HTMLDivElement) {
     } else if (tag === "work") {
       icon.classList.add("bi-briefcase");
       label.textContent = "Work";
+    } else if (tag === "school") {
+      icon.classList.add("bi-mortarboard");
     } else {
       icon.classList.add("bi-pin");
       label.textContent = tag.custom;
@@ -163,15 +188,15 @@ function TodoApp(listElement: HTMLDivElement) {
   }
 
   function completeAll(todos: Todo[]): Array<Todo & { done: true }> {
-    
+    return todos.map((todo) => ({ ...todo, done: true }));
   }
 
   function getTotalDone(todos: Todo[]): number {
-    
+    return todos.filter((todo) => todo.done).length;
   }
 
   function render() {
-    const todos = getState();
+    const todos = todoMngr.state;
     const total = getTotalDone(todos);
 
     const ulElement = listElement.querySelector("ul")!;
@@ -188,5 +213,6 @@ function TodoApp(listElement: HTMLDivElement) {
     render();
   });
 
-  setState([createTodo("First todo"), createTodo("Second todo")]);
+  todoMngr.state = [createTodo("First todo"), 
+                    createTodo("Second todo")];
 }
